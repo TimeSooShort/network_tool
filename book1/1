@@ -1,0 +1,141 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+
+#define BUF_SIZE 30
+void read_childproc(int sig);
+void error_handling(char *message);
+void deal_ctrlC(int sig);
+
+int main(int argc, char *argv[])
+{
+    struct sigaction act, ctrlC;
+    int serv_sock, clnt_sock;
+    struct sockaddr_in serv_adr, clnt_adr;
+    socklen_t adr_sz, optln;
+    pid_t pid;
+    char buf[BUF_SIZE];
+    int str_len, option;
+    char *shut_return = "\nOk, I know you will close, bye!\n";
+    if(argc != 2)
+    {
+        printf("Usage : %s <port>\n", argv[0]);
+        exit(1);
+    }
+    act.sa_handler = read_childproc;
+    sigemptyset(&act.sa_mask);
+    act.sa_flags=0;
+    sigaction(SIGCHLD, &act, 0);
+
+    ctrlC.sa_handler = deal_ctrlC;
+    sigemptyset(&ctrlC.sa_mask);
+    ctrlC.sa_flags=0;
+    sigaction(SIGINT, &ctrlC, 0);
+    
+    serv_sock=socket(PF_INET, SOCK_STREAM, 0);
+
+    if(serv_sock == -1)
+    {
+        error_handling("serv_sock error");
+    }
+    // deal with time-wait state
+    optln = sizeof(option);
+    option = 1;
+    setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR, (void*)&option, optln);
+
+    memset(&serv_adr, 0, sizeof(serv_adr));
+    serv_adr.sin_family = AF_INET;
+    serv_adr.sin_addr.s_addr=htonl(INADDR_ANY);
+    serv_adr.sin_port = htons(atoi(argv[1]));
+
+    if(bind(serv_sock, (struct sockaddr*)&serv_adr, sizeof(serv_adr)) == -1)
+    {
+        error_handling("bind() error");
+    }
+    if(listen(serv_sock, 5) == -1)
+    {
+        error_handling("listen() error");
+    }
+
+    while(1)
+    {
+        adr_sz = sizeof(clnt_adr);
+        clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_adr, &adr_sz);
+        if(clnt_sock == -1)
+        {
+            continue;
+        }
+        puts("new client connected...");
+        pid = fork();
+        if(pid == -1)
+        {
+            close(clnt_sock);
+            continue;
+        }
+        if(pid == 0)
+        {
+            close(serv_sock);
+            while((str_len = read(clnt_sock, buf, BUF_SIZE)) > 0)
+            {
+                write(clnt_sock, buf, str_len);
+            }
+
+            if(str_len == 0)
+            {
+                write(clnt_sock, shut_return, strlen(shut_return));
+            }
+            close(clnt_sock);
+            puts("client disconnected...");
+            return 0;
+        }
+        else
+        {
+            close(clnt_sock);
+        }
+    }
+    close(serv_sock);
+    return 0;
+}
+
+void deal_ctrlC(int sig)
+{
+    char confirm;
+    do{
+        fgetc(stdin);
+        printf("Confirm you want exit [Y/N]: ");
+        confirm = getchar();
+        while(getchar() != '\n') continue;
+    } while(confirm != 'N' && confirm != 'Y');
+    if(confirm == 'N') {
+        return;
+    }
+    else {
+        puts("Ok, Bye! child proc maybe exist, it will be take charged by the 1 proc");
+        exit(0);
+    }
+}
+
+void read_childproc(int sig)
+{
+    pid_t pid;
+    int status;
+    pid = waitpid(-1, &status, WNOHANG);
+    if(WIFEXITED(status))
+    {
+        printf("removed proc id: %d \n", pid);
+        printf("Child send: %d \n", WEXITSTATUS(status));
+    }
+}
+
+void error_handling(char *message)
+{
+    fputs(message, stderr);
+    fputc('\n', stderr);
+    exit(1);
+}
+
