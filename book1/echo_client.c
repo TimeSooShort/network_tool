@@ -63,8 +63,15 @@ int main(int argc, char *argv[])
         printf("Message from server: %s", buf);
     }
     shutdown(sock, SHUT_WR);
-    read(sock, buf, BUF_SIZE);
-    printf("The Message form server When client shotdown: %s \n", buf);
+    read_sz = read(sock, buf, BUF_SIZE);
+    if(read_sz > 0)
+    {
+        buf[read_sz] = 0;
+        printf("The Message form server When client shotdown: %s \n", buf);
+    }
+    else {
+        printf("Server return nothing, read size: %d \n", read_sz);
+    }
     close(sock);
     return 0;
 }

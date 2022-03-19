@@ -11,6 +11,7 @@
 void read_childproc(int sig);
 void error_handling(char *message);
 void deal_ctrlC(int sig);
+void deal_ctrlC_child(int sig);
 
 int main(int argc, char *argv[])
 {
@@ -62,7 +63,7 @@ int main(int argc, char *argv[])
         error_handling("listen() error");
     }
 
-    int father_first_signal = 1;
+    int first_signal = 1;
 
     while(1)
     {
@@ -97,9 +98,9 @@ int main(int argc, char *argv[])
         }
         else
         {
-            if(father_first_signal)
+            if(first_signal)
             {
-                father_first_signal = 0;
+                first_signal = 0;
                 ctrlC.sa_handler = deal_ctrlC;
                 sigemptyset(&ctrlC.sa_mask);
                 ctrlC.sa_flags=0;
@@ -110,6 +111,11 @@ int main(int argc, char *argv[])
     }
     close(serv_sock);
     return 0;
+}
+
+void deal_ctrlC_child(int sig)
+{
+    puts("Child: receive ctrl c sign, didn't do anything");
 }
 
 void deal_ctrlC(int sig)
