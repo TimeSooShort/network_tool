@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <fcntl.h>
 
 #define BUF_SIZE 30
 void read_childproc(int sig);
@@ -33,10 +34,10 @@ int main(int argc, char *argv[])
     act.sa_flags=0;
     sigaction(SIGCHLD, &act, 0);
 
-    /*ctrlC.sa_handler = deal_ctrlC;
-    sigemptyset(&ctrlC.sa_mask);
-    ctrlC.sa_flags=0;
-    sigaction(SIGINT, &ctrlC, 0);*/
+    //ctrlC.sa_handler = deal_ctrlC;
+    //sigemptyset(&ctrlC.sa_mask);
+    //ctrlC.sa_flags=0;
+    //sigaction(SIGINT, &ctrlC, 0);
     
     serv_sock=socket(PF_INET, SOCK_STREAM, 0);
 
@@ -44,6 +45,8 @@ int main(int argc, char *argv[])
     {
         error_handling("serv_sock error");
     }
+
+
     // deal with time-wait state
     optln = sizeof(option);
     option = 1;
@@ -73,7 +76,7 @@ int main(int argc, char *argv[])
         {
             continue;
         }
-        puts("new client connected...");
+        printf("new client connected...: %d \n", clnt_sock);
         pid = fork();
         if(pid == -1)
         {
@@ -82,6 +85,7 @@ int main(int argc, char *argv[])
         }
         if(pid == 0)
         {
+            printf("child socket id: %d \n", clnt_sock);
             close(serv_sock);
             while((str_len = read(clnt_sock, buf, BUF_SIZE)) > 0)
             {
@@ -120,6 +124,7 @@ void deal_ctrlC_child(int sig)
 
 void deal_ctrlC(int sig)
 {
+    printf("proc id: %d \n", getpid());
     char confirm;
     do{
         printf("Confirm you want exit [Y/N]: ");
